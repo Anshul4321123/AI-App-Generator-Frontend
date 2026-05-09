@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Page, Record } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Page, DataRecord } from '../../types';  // ← Change Record to DataRecord
 import { useRecords } from '../../hooks/useRecords';
 
 interface TableRendererProps {
   page: Page;
-  onEdit?: (record: Record) => void;
+  onEdit?: (record: DataRecord) => void;  // ← Change Record to DataRecord
   onDelete?: (id: string) => void;
+  refreshTrigger?: number;  // Add this for external refresh
 }
 
 // Helper to get nested value from object (e.g., "user.name" -> value)
@@ -16,7 +17,7 @@ function getNestedValue(obj: any, path: string): any {
 }
 
 // Get column keys from first record's data
-function inferColumns(records: Record[]): string[] {
+function inferColumns(records: DataRecord[]): string[] {  // ← Change Record to DataRecord
   if (records.length === 0) return [];
 
   const firstRecordData = records[0].data;
@@ -33,10 +34,17 @@ function formatCellValue(value: any): string {
   return String(value);
 }
 
-export default function TableRenderer({ page, onEdit, onDelete }: TableRendererProps) {
+export default function TableRenderer({ page, onEdit, onDelete, refreshTrigger }: TableRendererProps) {
   const { records, loading, error, deleteRecord, refetch } = useRecords(page.entity);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  // Refresh when external trigger changes (CSV import)
+  useEffect(() => {
+    if (refreshTrigger) {
+      refetch();
+    }
+  }, [refreshTrigger, refetch]);
 
   // Infer columns from data
   const columns = inferColumns(records);

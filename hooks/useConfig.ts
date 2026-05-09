@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { AppConfig } from '../types';
 import api from '../services/api';
+import { normalizeConfig, validateConfig } from '../utils/normalizeConfig';
 
 export function useConfig(appId: string) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     if (!appId) {
@@ -16,34 +18,38 @@ export function useConfig(appId: string) {
     const fetchConfig = async () => {
       setLoading(true);
       setError(null);
+      setWarnings([]);
       try {
         console.log('📡 Fetching config for app:', appId);
         const response = await api.get(`/api/apps/${appId}`);
-        console.log('✅ Config response:', response.data);
         
-        const appData = response.data.data;
+        const rawConfig = response.data.data;
+        console.log('📋 Raw config:', rawConfig);
         
-        // Ensure the config has the expected structure
-        const formattedConfig: AppConfig = {
-          id: appData.id,
-          name: appData.name,
-          pages: appData.config?.pages || [],
-          config: appData.config || {}
-        };
+        // Validate and log warnings
+        const validationWarnings = validateConfig(rawConfig?.config || rawConfig);
+        if (validationWarnings.length > 0) {
+          console.warn('⚠️ Config warnings:', validationWarnings);
+          setWarnings(validationWarnings);
+        }
         
-        console.log('📋 Formatted config:', formattedConfig);
-        console.log('📄 Pages in config:', formattedConfig.pages);
+        // Normalize the config (makes it safe to render)
+        const normalizedConfig = normalizeConfig(rawConfig?.config || rawConfig);
+        normalizedConfig.id = rawConfig.id;
+        normalizedConfig.name = rawConfig.name;
         
-        setConfig(formattedConfig);
+        console.log('✅ Normalized config:', normalizedConfig);
+        
+        setConfig(normalizedConfig);
       } catch (err: any) {
         console.error('❌ Failed to fetch config:', err);
         setError(err.response?.data?.error || 'Failed to load configuration');
-        // Fallback empty config
+        // Return a safe fallback config
         setConfig({
           id: appId,
           name: 'Unknown App',
           pages: [],
-          config: {}
+          config: {},
         });
       } finally {
         setLoading(false);
@@ -53,5 +59,5 @@ export function useConfig(appId: string) {
     fetchConfig();
   }, [appId]);
 
-  return { config, loading, error };
+  return { config, loading, error, warnings };
 }
