@@ -10,6 +10,7 @@ interface Field {
   name: string;
   type: 'text' | 'email' | 'number' | 'textarea' | 'select';
   required: boolean;
+  options?: { value: string; label: string }[];
 }
 
 interface Template {
@@ -29,7 +30,11 @@ const templates: Template[] = [
       { name: 'email', type: 'email', required: true },
       { name: 'phone', type: 'text', required: false },
       { name: 'city', type: 'text', required: false },
-      { name: 'status', type: 'select', required: true },
+      { name: 'status', type: 'select', required: true, options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+        { value: 'pending', label: 'Pending' },
+      ] },
     ],
   },
   {
@@ -49,7 +54,11 @@ const templates: Template[] = [
     entity: 'tasks',
     fields: [
       { name: 'title', type: 'text', required: true },
-      { name: 'priority', type: 'select', required: true },
+      { name: 'priority', type: 'select', required: true, options: [
+        { value: 'high', label: 'High' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'low', label: 'Low' },
+      ] },
       { name: 'due_date', type: 'text', required: false },
       { name: 'description', type: 'textarea', required: false },
     ],
@@ -85,6 +94,14 @@ export default function CreateAppPage() {
     ));
   };
 
+  const updateFieldOptions = (index: number, optionsText: string) => {
+    const options = optionsText.split(',').map(opt => ({
+      value: opt.trim().toLowerCase(),
+      label: opt.trim(),
+    }));
+    updateField(index, { options });
+  };
+
   const loadTemplate = (templateName: string) => {
     if (templateName === 'custom') {
       setEntityName('');
@@ -105,12 +122,21 @@ export default function CreateAppPage() {
   };
 
   const generateConfig = () => {
-    const formFields = fields.map(field => ({
-      name: field.name,
-      type: field.type,
-      label: field.name.charAt(0).toUpperCase() + field.name.slice(1),
-      required: field.required,
-    }));
+    const formFields = fields.map(field => {
+      const baseField = {
+        name: field.name,
+        type: field.type,
+        label: field.name.charAt(0).toUpperCase() + field.name.slice(1),
+        required: field.required,
+      };
+      
+      // Add options for select fields
+      if (field.type === 'select' && field.options && field.options.length > 0) {
+        return { ...baseField, options: field.options };
+      }
+      
+      return baseField;
+    });
 
     return {
       pages: [
@@ -177,7 +203,6 @@ export default function CreateAppPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Error message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-600">{error}</p>
@@ -205,7 +230,7 @@ export default function CreateAppPage() {
             Quick Start Template
           </label>
           <select
-          aria-label='Template'
+          aria-label='b'
             value={selectedTemplate}
             onChange={(e) => handleTemplateChange(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -257,52 +282,73 @@ export default function CreateAppPage() {
 
           <div className="space-y-3">
             {fields.map((field, index) => (
-              <div key={index} className="flex gap-3 items-start bg-gray-50 p-3 rounded-lg">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={field.name}
-                    onChange={(e) => updateField(index, { name: e.target.value.toLowerCase() })}
-                    placeholder="Field name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-                <div className="w-32">
-                  <select
-                  aria-label='feild'
-                    value={field.type}
-                    onChange={(e) => updateField(index, { type: e.target.value as Field['type'] })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    <option value="text">Text</option>
-                    <option value="email">Email</option>
-                    <option value="number">Number</option>
-                    <option value="textarea">Textarea</option>
-                    <option value="select">Select</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1 text-sm">
+              <div key={index} className="bg-gray-50 p-3 rounded-lg space-y-2">
+                <div className="flex gap-3">
+                  <div className="flex-1">
                     <input
-                      type="checkbox"
-                      checked={field.required}
-                      onChange={(e) => updateField(index, { required: e.target.checked })}
-                      className="rounded"
+                      type="text"
+                      value={field.name}
+                      onChange={(e) => updateField(index, { name: e.target.value.toLowerCase() })}
+                      placeholder="Field name"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
-                    Required
-                  </label>
-                  <button
-                  aria-label='remove-field'
-                    type="button"
-                    onClick={() => removeField(index)}
-                    className="text-red-600 hover:text-red-700"
-                    disabled={fields.length === 1}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  </div>
+                  <div className="w-32">
+                    <select
+                    aria-label='i'
+                      value={field.type}
+                      onChange={(e) => updateField(index, { type: e.target.value as Field['type'] })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      <option value="text">Text</option>
+                      <option value="email">Email</option>
+                      <option value="number">Number</option>
+                      <option value="textarea">Textarea</option>
+                      <option value="select">Select</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1 text-sm whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) => updateField(index, { required: e.target.checked })}
+                        className="rounded"
+                      />
+                      Required
+                    </label>
+                    <button
+                    aria-label='h'
+                      type="button"
+                      onClick={() => removeField(index)}
+                      className="text-red-600 hover:text-red-700 p-1"
+                      disabled={fields.length === 1}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
+                
+                {/* Options for select type */}
+                {field.type === 'select' && (
+                  <div className="ml-4">
+                    <label className="text-xs text-gray-600 block mb-1">
+                      Options (comma-separated):
+                    </label>
+                    <input
+                      type="text"
+                      value={field.options?.map(opt => opt.label).join(', ') || ''}
+                      onChange={(e) => updateFieldOptions(index, e.target.value)}
+                      placeholder="e.g., Active, Inactive, Pending"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Enter options separated by commas (e.g., Option 1, Option 2, Option 3)
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -314,7 +360,7 @@ export default function CreateAppPage() {
             <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-800">
               Show Config Preview
             </summary>
-            <pre className="mt-3 p-4 bg-gray-900 text-gray-200 rounded-lg text-xs overflow-x-auto">
+            <pre className="mt-3 p-4 bg-gray-900 text-gray-200 rounded-lg text-xs overflow-x-auto max-h-96">
               {JSON.stringify(generateConfig(), null, 2)}
             </pre>
           </details>
