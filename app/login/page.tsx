@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '../../store/authStore';
@@ -9,24 +9,11 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, token, login, isLoading, checkAuth } = useAuthStore();
+  const { login, isLoading } = useAuthStore();
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    const verifyAuth = async () => {
-      const isValid = await checkAuth();
-      if (isValid && user && token) {
-        router.push('/dashboard');
-      }
-      setIsCheckingAuth(false);
-    };
-    verifyAuth();
-  }, [checkAuth, router, user, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,18 +26,6 @@ export default function LoginPage() {
       setError(err.message);
     }
   };
-
-  // Show loading while checking auth
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

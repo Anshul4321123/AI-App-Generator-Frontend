@@ -27,18 +27,20 @@ export default function TeamManagementPage() {
     }
   }, [isAdmin]);
 
-  const fetchUsers = async () => {
-    try {
-      setError(null);
-      const response = await api.get('/auth/users');
-      setUsers(response.data.data || []);
-    } catch (err: any) {
-      console.error('Failed to fetch users:', err);
-      setError(err.response?.data?.error || 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchUsers = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    // ✅ Use /users/team endpoint which has domain filtering for team page
+    const response = await api.get('/auth/users/team');
+    setUsers(response.data.data || []);
+  } catch (err: any) {
+    console.error('Failed to fetch users:', err);
+    setError(err.response?.data?.error || 'Failed to load users');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const updateUserRole = async (userId: string, newRole: string) => {
     setUpdatingId(userId);
