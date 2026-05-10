@@ -1,17 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Page, Field } from '../../types';
+import { Page } from '../../types';
 import { useRecords } from '../../hooks/useRecords';
 import { useLanguage } from '../../context/LanguageContext';
+import MultiUserSelect from '../MultiUserSelect';
+import ProjectSelect from '../ProjectSelect';
 
 interface FormRendererProps {
   page: Page;
   onSuccess?: () => void;
+  initialData?: Record<string, any>;
+  isEdit?: boolean;
+  onUpdate?: (id: string, data: any) => Promise<void>;
+  recordId?: string;
 }
 
-// Helper to get label text with localization support
+// Helper to get label text
 function getLabel(
   label: string | Record<string, string> | undefined, 
   fieldName: string, 
@@ -19,40 +25,104 @@ function getLabel(
   t: (key: string, fallback?: string) => string
 ): string {
   if (!label) {
-    // Try to get from translations, fallback to field name
-    const translated = t(`label.${fieldName}`, fieldName);
-    return translated.charAt(0).toUpperCase() + translated.slice(1);
+    return fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
   }
   if (typeof label === 'string') return label;
-  // Return language-specific label or fallback to English or first available
-  return label[language] || label.en || Object.values(label)[0] || fieldName;
+  return label[language] || Object.values(label)[0] || fieldName;
 }
 
-export default function FormRenderer({ page, onSuccess }: FormRendererProps) {
+// Parse stored assigned_users from JSON string
+function parseAssignedUsers(value: any): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export default function FormRenderer({ page, onSuccess, initialData, isEdit, onUpdate, recordId }: FormRendererProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { createRecord } = useRecords(page.entity);
+  const [multiSelectValues, setMultiSelectValues] = useState<Record<string, string[]>>({});
+  const { createRecord, updateRecord } = useRecords(page.entity);
   const { language, t } = useLanguage();
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm();
+
+  // Initialize form with existing data for edit mode
+  useEffect(() => {
+    if (initialData) {
+      Object.keys(initialData).forEach(key => {
+        setValue(key, initialData[key]);
+      });
+      
+      Object.keys(initialData).forEach(key => {
+        if (initialData[key] && (key === 'assigned_users' || key.includes('users'))) {
+          const parsed = parseAssignedUsers(initialData[key]);
+          setMultiSelectValues(prev => ({ ...prev, [key]: parsed }));
+        }
+      });
+    }
+  }, [initialData, setValue]);
 
   const onSubmit = async (data: any) => {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await createRecord(data);
+      const processedData = { ...data };
+      
+      // Handle multi-select values
+      Object.keys(multiSelectValues).forEach(key => {
+        processedData[key] = JSON.stringify(multiSelectValues[key]);
+      });
+      
+      // Format date properly - ENFORCE DATE TYPE
+      if (processedData.due_date && processedData.due_date !== '') {
+        const dateObj = new Date(processedData.due_date);
+        if (!isNaN(dateObj.getTime())) {
+          processedData.due_date = dateObj.toISOString().split('T')[0];
+        } else {
+          delete processedData.due_date;
+        }
+      }
+      
+      // ENFORCE NUMBER TYPE for story_points
+      if (processedData.story_points) {
+        processedData.story_points = Number(processedData.story_points);
+        if (isNaN(processedData.story_points)) {
+          delete processedData.story_points;
+        }
+      }
+      
+      if (isEdit && onUpdate && recordId) {
+        await onUpdate(recordId, processedData);
+      } else {
+        await createRecord(processedData);
+      }
+      
       reset();
+      setMultiSelectValues({});
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      setSubmitError(err.message);
+      console.error('Submit error:', err);
+      setSubmitError(err.message || 'Failed to save record');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleMultiSelectChange = (fieldName: string, values: string[]) => {
+    setMultiSelectValues(prev => ({ ...prev, [fieldName]: values }));
+    setValue(fieldName, JSON.stringify(values));
   };
 
   const fields = page.fields || [];
@@ -60,22 +130,36 @@ export default function FormRenderer({ page, onSuccess }: FormRendererProps) {
   if (fields.length === 0) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-        <p className="text-gray-500">{t('message.noFields') || 'No fields configured for this form.'}</p>
+        <p className="text-gray-500">No fields configured for this form.</p>
       </div>
     );
   }
 
+  // Helper to determine input type based on field name
+  const getForcedInputType = (fieldName: string): string => {
+    // FORCE date picker for due_date
+    if (fieldName === 'due_date') return 'date';
+    // FORCE number for story_points
+    if (fieldName === 'story_points') return 'number';
+    // FORCE email for email fields
+    if (fieldName === 'email') return 'email';
+    // Default to text
+    return 'text';
+  };
+
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">{page.title}</h2>
+        <h2 className="text-xl font-semibold text-gray-800">
+          {isEdit ? `Edit ${page.title.replace('Create', '').trim()}` : page.title}
+        </h2>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
         {fields.map((field) => {
           const label = getLabel(field.label, field.name, language, t);
           const isRequired = field.required || false;
-          const placeholder = field.placeholder || t(`placeholder.enter${field.name.charAt(0).toUpperCase() + field.name.slice(1)}`, `Enter ${label.toLowerCase()}`);
+          const placeholder = field.placeholder || `Enter ${label.toLowerCase()}`;
           
           const baseInputClass = `
             w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 
@@ -85,47 +169,155 @@ export default function FormRenderer({ page, onSuccess }: FormRendererProps) {
             }
           `;
 
-          return (
-            <div key={field.name}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {label}
-                {isRequired && <span className="text-red-500 ml-1">*</span>}
-              </label>
-              
-              {/* Field rendering based on type */}
-              {field.type === 'textarea' && (
+          // ============ FORCE Multi-Select for assigned_users ============
+          if (field.name === 'assigned_users') {
+            return (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                <MultiUserSelect
+                  value={multiSelectValues[field.name] || parseAssignedUsers(initialData?.[field.name])}
+                  onChange={(values) => handleMultiSelectChange(field.name, values)}
+                  placeholder={placeholder || 'Select team members'}
+                />
+              </div>
+            );
+          }
+
+          // ============ FORCE Project Select ============
+          if (field.name === 'project_id') {
+            return (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                <ProjectSelect
+                  value={initialData?.[field.name] || ''}
+                  onChange={(projectId) => {
+                    setValue(field.name, projectId);
+                  }}
+                  placeholder={placeholder || 'Select a project'}
+                  required={isRequired}
+                />
+              </div>
+            );
+          }
+
+          // ============ FORCE Textarea ============
+          if (field.type === 'textarea') {
+            return (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
                 <textarea
                   {...register(field.name, { required: isRequired })}
                   placeholder={placeholder}
                   rows={4}
                   className={baseInputClass}
+                  defaultValue={initialData?.[field.name] || ''}
                 />
-              )}
-              
-              {field.type === 'select' && (
+                {errors[field.name] && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors[field.name]?.message as string || `${label} is required`}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
+          // ============ FORCE Select field ============
+          if (field.type === 'select') {
+            return (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
                 <select
                   {...register(field.name, { required: isRequired })}
                   className={baseInputClass}
+                  defaultValue={initialData?.[field.name] || ''}
                 >
-                  <option value="">{t('placeholder.selectOption')}</option>
+                  <option value="">Select an option</option>
                   {field.options?.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}
                 </select>
-              )}
-              
-              {field.type === 'number' && (
+                {errors[field.name] && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors[field.name]?.message as string || `${label} is required`}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
+          // ============ FORCED INPUT TYPES based on field name ============
+          const forcedType = getForcedInputType(field.name);
+          
+          // FORCED Date input
+          if (forcedType === 'date') {
+            return (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                <input
+                  type="date"
+                  {...register(field.name, { required: isRequired })}
+                  className={baseInputClass}
+                  defaultValue={initialData?.[field.name]?.split('T')[0] || ''}
+                />
+                {errors[field.name] && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors[field.name]?.message as string || `${label} is required`}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
+          // FORCED Number input
+          if (forcedType === 'number') {
+            return (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
                 <input
                   type="number"
+                  step="1"
                   {...register(field.name, { required: isRequired, valueAsNumber: true })}
                   placeholder={placeholder}
                   className={baseInputClass}
+                  defaultValue={initialData?.[field.name] || ''}
                 />
-              )}
-              
-              {field.type === 'email' && (
+                {errors[field.name] && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors[field.name]?.message as string || `${label} is required`}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
+          // FORCED Email input
+          if (forcedType === 'email') {
+            return (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
                 <input
                   type="email"
                   {...register(field.name, { 
@@ -137,18 +329,31 @@ export default function FormRenderer({ page, onSuccess }: FormRendererProps) {
                   })}
                   placeholder={placeholder}
                   className={baseInputClass}
+                  defaultValue={initialData?.[field.name] || ''}
                 />
-              )}
-              
-              {(field.type === 'text' || !field.type) && (
-                <input
-                  type="text"
-                  {...register(field.name, { required: isRequired })}
-                  placeholder={placeholder}
-                  className={baseInputClass}
-                />
-              )}
-              
+                {errors[field.name] && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors[field.name]?.message as string || `${label} is required`}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
+          // ============ Default Text input ============
+          return (
+            <div key={field.name}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {label}
+                {isRequired && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              <input
+                type="text"
+                {...register(field.name, { required: isRequired })}
+                placeholder={placeholder}
+                className={baseInputClass}
+                defaultValue={initialData?.[field.name] || ''}
+              />
               {errors[field.name] && (
                 <p className="mt-1 text-sm text-red-600">
                   {errors[field.name]?.message as string || `${label} is required`}
@@ -169,7 +374,7 @@ export default function FormRenderer({ page, onSuccess }: FormRendererProps) {
           disabled={isSubmitting}
           className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isSubmitting ? t('action.submitting') : t('action.submit')}
+          {isSubmitting ? 'Saving...' : isEdit ? 'Update' : 'Submit'}
         </button>
       </form>
     </div>

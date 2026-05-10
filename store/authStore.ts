@@ -1,11 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import api from '../services/api';
-
-interface User {
-  id: string;
-  email: string;
-}
+import { User } from '../types';
 
 interface AuthState {
   user: User | null;
@@ -29,11 +25,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/login', { email, password });
           const { token, user } = response.data.data;
-          console.log('🔐 Login successful, token:', token.substring(0, 50) + '...'); // ADD THIS LOG
           localStorage.setItem('token', token);
           set({ user, token, isLoading: false });
         } catch (error: any) {
-          console.error('❌ Login failed:', error);
           set({ isLoading: false });
           throw new Error(error.response?.data?.error || 'Login failed');
         }
@@ -44,11 +38,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await api.post('/auth/register', { email, password });
           const { token, user } = response.data.data;
-          console.log('🔐 Registration successful, token:', token.substring(0, 50) + '...'); // ADD THIS LOG
           localStorage.setItem('token', token);
           set({ user, token, isLoading: false });
         } catch (error: any) {
-          console.error('❌ Registration failed:', error);
           set({ isLoading: false });
           throw new Error(error.response?.data?.error || 'Registration failed');
         }
@@ -63,12 +55,12 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuth: async () => {
         const token = get().token || localStorage.getItem('token');
-        console.log('🔍 Checking auth, token exists:', !!token); // ADD THIS LOG
         if (!token) return false;
 
         try {
           const response = await api.get('/auth/me');
-          set({ user: response.data.data });
+          const userData = response.data.data;
+          set({ user: userData });
           return true;
         } catch {
           get().logout();

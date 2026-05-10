@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   email: string;
+  role: 'admin' | 'team_lead' | 'member';
 }
 
 export interface AuthResponse {
@@ -14,7 +15,7 @@ export interface AuthResponse {
 
 export interface Field {
   name: string;
-  type: 'text' | 'email' | 'number' | 'textarea' | 'select';
+  type: 'text' | 'email' | 'number' | 'textarea' | 'select' | 'date' | 'multi-select' | 'project-select';
   label: string | Record<string, string>;
   required?: boolean;
   options?: Array<{ value: string; label: string }>;
@@ -35,7 +36,6 @@ export interface AppConfig {
   config?: Record<string, any>;
 }
 
-// Changed from 'Record' to 'DataRecord' to avoid conflict with TypeScript's built-in Record type
 export interface DataRecord {
   id: string;
   entity_name: string;

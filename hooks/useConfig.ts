@@ -20,11 +20,11 @@ export function useConfig(appId: string) {
       setError(null);
       setWarnings([]);
       try {
-        console.log('📡 Fetching config for app:', appId);
+        // console.log('📡 Fetching config for app:', appId);
         const response = await api.get(`/api/apps/${appId}`);
         
         const rawConfig = response.data.data;
-        console.log('📋 Raw config:', rawConfig);
+        // console.log('📋 Raw config:', rawConfig);
         
         // Validate and log warnings
         const validationWarnings = validateConfig(rawConfig?.config || rawConfig);
@@ -38,7 +38,7 @@ export function useConfig(appId: string) {
         normalizedConfig.id = rawConfig.id;
         normalizedConfig.name = rawConfig.name;
         
-        console.log('✅ Normalized config:', normalizedConfig);
+        // console.log('✅ Normalized config:', normalizedConfig);
         
         setConfig(normalizedConfig);
       } catch (err: any) {

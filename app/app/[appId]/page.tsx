@@ -23,7 +23,7 @@ export default function AppPage() {
 
   // Force refresh of all child components
   const handleRefresh = useCallback(() => {
-    console.log('🔄 Refreshing all components...');
+    // console.log('🔄 Refreshing all components...');
     setRefreshKey(prev => prev + 1);
   }, []);
 

@@ -18,10 +18,13 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
   const [result, setResult] = useState<{ imported: number; failed: number; total: number } | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null); // ← Store file in state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useLanguage();
   const { addNotification } = useNotificationStore();
+
+  // Get API URL from environment variable
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   const parseCSVHeaders = (file: File): Promise<string[]> => {
     return new Promise((resolve, reject) => {
@@ -50,7 +53,6 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
       return;
     }
 
-    // Store the file in state
     setSelectedFile(file);
     setIsUploading(true);
     
@@ -84,18 +86,13 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
   };
 
   const handleImport = async () => {
-    // Use the stored file from state instead of ref
     const file = selectedFile;
-    console.log('🔍 handleImport called, file:', file?.name);
     
     if (!file) {
       console.error('No file found!');
       if (onError) onError('No file selected');
       return;
     }
-
-    console.log('📤 Starting import for entity:', entity);
-    console.log('📋 Column mapping:', columnMapping);
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -104,17 +101,15 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
     formData.append('file', file);
     formData.append('columnMapping', JSON.stringify(columnMapping));
 
-    // Simulate progress
     const progressInterval = setInterval(() => {
       setUploadProgress(prev => Math.min(prev + 10, 90));
     }, 200);
 
     try {
       const token = localStorage.getItem('token');
-      console.log('🔑 Token exists:', !!token);
       
-      // Use fetch directly for debugging
-      const response = await fetch(`http://localhost:5000/api/import/${entity}`, {
+      // ✅ Use dynamic API URL from environment variable
+      const response = await fetch(`${API_BASE_URL}/api/import/${entity}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -122,9 +117,7 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
         body: formData,
       });
 
-      console.log('📡 Response status:', response.status);
       const data = await response.json();
-      console.log('📦 Response data:', data);
 
       if (response.ok) {
         clearInterval(progressInterval);
@@ -133,7 +126,6 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
         const { imported, failed, total } = data.data;
         setResult({ imported, failed, total });
         
-        // Add success notification
         addNotification({
           id: Date.now().toString(),
           message: `CSV Import: ${imported} records imported to ${entity}${failed > 0 ? ` (${failed} failed)` : ''}`,
@@ -144,11 +136,10 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
         
         if (onSuccess) onSuccess();
         
-        // Reset after 3 seconds
         setTimeout(() => {
           setResult(null);
           setShowMapping(false);
-          setSelectedFile(null); // Clear the stored file
+          setSelectedFile(null);
           if (fileInputRef.current) fileInputRef.current.value = '';
         }, 3000);
       } else {
@@ -157,7 +148,7 @@ export default function CSVImport({ entity, onSuccess, onError }: CSVImportProps
     } catch (err: any) {
       console.error('❌ Import error:', err);
       clearInterval(progressInterval);
-      const errorMsg = err.message || err.response?.data?.error || 'Import failed';
+      const errorMsg = err.message || 'Import failed';
       if (onError) onError(errorMsg);
       addNotification({
         id: Date.now().toString(),

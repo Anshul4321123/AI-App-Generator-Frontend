@@ -20,6 +20,7 @@ export default function AllAppsPage() {
   const [apps, setApps] = useState<App[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     const fetchApps = async () => {
@@ -40,9 +41,22 @@ export default function AllAppsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">All Apps</h1>
-          <p className="text-gray-600 mt-1">Browse all your generated applications</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">All Apps</h1>
+            <p className="text-gray-600 mt-1">Browse all your generated applications</p>
+          </div>
+          {isAdmin && (
+            <Link
+              href="/dashboard/team"
+              className="inline-flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              Team Management
+            </Link>
+          )}
         </div>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -63,11 +77,24 @@ export default function AllAppsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">All Apps</h1>
-        <p className="text-gray-600 mt-1">
-          You have {apps.length} app{apps.length !== 1 ? 's' : ''} in your workspace
-        </p>
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">All Apps</h1>
+          <p className="text-gray-600 mt-1">
+            You have {apps.length} app{apps.length !== 1 ? 's' : ''} in your workspace
+          </p>
+        </div>
+        {isAdmin && (
+          <Link
+            href="/dashboard/team"
+            className="inline-flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            Team Management
+          </Link>
+        )}
       </div>
 
       {apps.length === 0 ? (
