@@ -186,25 +186,32 @@ export default function FormRenderer({ page, onSuccess, initialData, isEdit, onU
             );
           }
 
-          // ============ FORCE Project Select ============
-          if (field.name === 'project_id') {
-            return (
-              <div key={field.name}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {label}
-                  {isRequired && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                <ProjectSelect
-                  value={initialData?.[field.name] || ''}
-                  onChange={(projectId) => {
-                    setValue(field.name, projectId);
-                  }}
-                  placeholder={placeholder || 'Select a project'}
-                  required={isRequired}
-                />
-              </div>
-            );
+// ============ FORCE Project Select ============
+if (field.name === 'project_id') {
+  // Get the current value from form state or initialData
+  const currentProjectValue = initialData?.[field.name] || '';
+  
+  return (
+    <div key={field.name}>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+        {isRequired && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <ProjectSelect
+        value={currentProjectValue}
+        onChange={(projectId) => {
+          setValue(field.name, projectId);
+          // Also store in initialData for persistence
+          if (initialData) {
+            initialData[field.name] = projectId;
           }
+        }}
+        placeholder={placeholder || 'Select a project'}
+        required={isRequired}
+      />
+    </div>
+  );
+}
 
           // ============ FORCE Textarea ============
           if (field.type === 'textarea') {
