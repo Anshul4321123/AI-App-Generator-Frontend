@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '../store/authStore';
@@ -9,18 +9,23 @@ export default function HomePage() {
   const router = useRouter();
   const { user, token, checkAuth, isLoading } = useAuthStore();
   const [checking, setChecking] = useState(true);
+  const hasRedirected = useRef(false); // ✅ Prevent multiple redirects
 
   useEffect(() => {
     const verifyAuth = async () => {
+      // ✅ Only check once
+      if (hasRedirected.current) return;
+      
       const isValid = await checkAuth();
-      if (isValid && user && token) {
-        // If already authenticated, redirect to dashboard
+      if (isValid && user && token && !hasRedirected.current) {
+        hasRedirected.current = true;
         router.push('/dashboard');
       }
       setChecking(false);
     };
     verifyAuth();
-  }, [checkAuth, router, user, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // ✅ Empty dependency array - runs only once on mount
 
   // Show loading while checking auth
   if (checking || isLoading) {
@@ -43,7 +48,7 @@ export default function HomePage() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          AI App Generator
+          Team Task Manager
         </h1>
         <p className="text-gray-500">Create dynamic applications without code</p>
         <div className="space-x-4 pt-4">
