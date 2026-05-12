@@ -1,17 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '../../store/authStore';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, isLoading } = useAuthStore();
+
+  const {
+    register,
+    isLoading,
+    user,
+    token,
+    checkAuth,
+  } = useAuthStore();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  const hasRedirected = useRef(false);
+
+  // ✅ Auto redirect if already logged in
+  useEffect(() => {
+    const verifyAuth = async () => {
+      if (hasRedirected.current) return;
+
+      const isValid = await checkAuth();
+
+      if (isValid && user && token) {
+        hasRedirected.current = true;
+        router.replace('/dashboard');
+      }
+
+      setCheckingAuth(false);
+    };
+
+    verifyAuth();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,11 +60,25 @@ export default function RegisterPage() {
 
     try {
       await register(email, password);
-      router.push('/dashboard');
+
+      // ✅ Redirect after successful registration
+      router.replace('/dashboard');
     } catch (err: any) {
       setError(err.message);
     }
   };
+
+  // ✅ Loading screen while checking auth
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -42,9 +87,13 @@ export default function RegisterPage() {
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Create your account
           </h2>
+
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{' '}
-            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link
+              href="/login"
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
               sign in to existing account
             </Link>
           </p>
@@ -62,6 +111,7 @@ export default function RegisterPage() {
               <label htmlFor="email" className="sr-only">
                 Email address
               </label>
+
               <input
                 id="email"
                 name="email"
@@ -73,10 +123,12 @@ export default function RegisterPage() {
                 placeholder="Email address"
               />
             </div>
+
             <div>
               <label htmlFor="password" className="sr-only">
                 Password
               </label>
+
               <input
                 id="password"
                 name="password"
@@ -88,10 +140,12 @@ export default function RegisterPage() {
                 placeholder="Password (min. 6 characters)"
               />
             </div>
+
             <div>
               <label htmlFor="confirm-password" className="sr-only">
                 Confirm Password
               </label>
+
               <input
                 id="confirm-password"
                 name="confirm-password"
